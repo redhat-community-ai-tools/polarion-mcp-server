@@ -1,0 +1,47 @@
+[
+  {
+    "stepNumber": 1,
+    "stepInstruction": "Verify Windows nodes are ready<br/><code>oc get nodes -l kubernetes.io/os=windows</code>",
+    "stepExpectedResult": "All Windows nodes show STATUS \"Ready\""
+  },
+  {
+    "stepNumber": 2,
+    "stepInstruction": "Query controllerConfig for certificate data<br/><code>oc get controllerconfig machine-config-controller -o yaml</code>",
+    "stepExpectedResult": "controllerConfig contains:<br/>- spec.kubeAPIServerServingCAData (required)<br/>- spec.cloudProviderCAData (optional)<br/>- spec.additionalTrustBundle (optional)"
+  },
+  {
+    "stepNumber": 3,
+    "stepInstruction": "Extract and verify kubelet CA certificate<br/><code>oc get controllerconfig machine-config-controller -o jsonpath='{.spec.kubeAPIServerServingCAData}' | base64 -d</code>",
+    "stepExpectedResult": "Base64-decoded PEM certificate displayed"
+  },
+  {
+    "stepNumber": 4,
+    "stepInstruction": "Verify kubelet-ca.crt exists on Windows nodes<br/><code>Get-Item C:\\k\\kubelet-ca.crt</code>",
+    "stepExpectedResult": "File exists at C:\\k\\kubelet-ca.crt"
+  },
+  {
+    "stepNumber": 5,
+    "stepInstruction": "Verify kubelet-ca.crt matches controllerConfig<br/><code>Get-Content C:\\k\\kubelet-ca.crt -Raw</code>",
+    "stepExpectedResult": "Certificate content matches controllerConfig.spec.kubeAPIServerServingCAData"
+  },
+  {
+    "stepNumber": 6,
+    "stepInstruction": "Verify cloud provider CA (if configured)<br/>Check: <code>oc get controllerconfig machine-config-controller -o jsonpath='{.spec.cloudProviderCAData}'</code><br/>If configured: <code>Get-Item C:\\k\\ca-bundle.crt</code>",
+    "stepExpectedResult": "If configured: file exists and matches controllerConfig data<br/>If not configured: validation skipped (e.g., AWS)"
+  },
+  {
+    "stepNumber": 7,
+    "stepInstruction": "Verify user CA bundle (if configured)<br/><code>Get-ChildItem -Path Cert:\\LocalMachine\\Root | Measure-Object</code>",
+    "stepExpectedResult": "If configured: certificates in Windows store, count > 0<br/>If not configured: validation skipped"
+  },
+  {
+    "stepNumber": 8,
+    "stepInstruction": "Verify kubelet service is running<br/><code>Get-Service kubelet</code>",
+    "stepExpectedResult": "Kubelet service Status: Running"
+  },
+  {
+    "stepNumber": 9,
+    "stepInstruction": "Verify Windows nodes remain Ready<br/><code>oc get nodes -l kubernetes.io/os=windows -o wide</code>",
+    "stepExpectedResult": "All Windows nodes Ready, no certificate errors"
+  }
+]

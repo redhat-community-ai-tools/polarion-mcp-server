@@ -1,21 +1,32 @@
 """
-Polarion REST API Client
-Core client for interacting with Polarion REST API
+Polarion REST API Client with SOAP API support
+Core client for interacting with Polarion REST and SOAP APIs
 """
 
 import os
 import requests
+import base64
 from typing import Optional, Dict, Any, List
 
 
 class PolarionClient:
-    """Client for Polarion REST API operations"""
+    """Client for Polarion REST API operations with SOAP fallback"""
 
-    def __init__(self, url: str, token: str, verify_ssl: bool = True):
+    def __init__(
+        self,
+        url: str,
+        token: str,
+        verify_ssl: bool = True,
+        username: Optional[str] = None,
+        password: Optional[str] = None
+    ):
         self.url = url
         self.token = token
         self.verify_ssl = verify_ssl
         self.base_url = f"{url}/polarion/rest/v1"
+        self.username = username
+        self.password = password
+        self.soap_url = f"{url}/polarion/ws/services/TestManagementWebService"
 
     def _make_request(
         self,
@@ -95,18 +106,24 @@ class PolarionClient:
         title: str,
         description: str,
         project_id: str,
-        test_steps: Optional[str] = None,
-        expected_results: Optional[str] = None,
+        test_steps: Optional[List[Dict[str, str]]] = None,
         severity: str = "should_have",
-        status: str = "draft"
+        status: str = "draft",
+        blank_slate_strategy: bool = True
     ) -> Dict[str, Any]:
-        """Create a new test case"""
+        """
+        Create a new test case with optional immediate test steps
 
-        full_description = description
-        if test_steps:
-            full_description += f"\n\n## Test Steps\n{test_steps}"
-        if expected_results:
-            full_description += f"\n\n## Expected Results\n{expected_results}"
+        Args:
+            title: Test case title
+            description: Test case description
+            project_id: Polarion project ID
+            test_steps: Optional list of test step dicts with 'step' and 'expectedResult'
+            severity: Test case severity
+            status: Test case status
+            blank_slate_strategy: If True and test_steps provided, add steps immediately
+                                  before any manual edits (prevents REST API limitation)
+        """
 
         workitem_data = {
             "data": [{
@@ -116,7 +133,7 @@ class PolarionClient:
                     "title": title,
                     "description": {
                         "type": "text/html",
-                        "value": full_description.replace("\n", "<br/>")
+                        "value": description.replace("\n", "<br/>")
                     },
                     "status": status,
                     "severity": severity
@@ -139,7 +156,7 @@ class PolarionClient:
         test_case_data = result.get("data", [{}])[0] if isinstance(result.get("data"), list) else result.get("data", {})
         test_case_id = test_case_data.get("id", "unknown")
 
-        return {
+        response = {
             "status": "success",
             "message": "Test case created successfully",
             "test_case_id": test_case_id,
@@ -148,29 +165,155 @@ class PolarionClient:
             "url": f"{self.url}/polarion/#/project/{project_id}/workitem?id={test_case_id}"
         }
 
-    def add_test_steps(
+        # Blank slate strategy: Add test steps immediately if provided
+        if test_steps and blank_slate_strategy:
+            steps_result = self.add_test_steps(test_case_id, test_steps, project_id)
+            if steps_result["status"] == "success":
+                response["message"] += f" with {len(test_steps)} test steps"
+                response["test_steps_added"] = len(test_steps)
+            else:
+                response["warning"] = f"Test case created but failed to add steps: {steps_result.get('error')}"
+
+        return response
+
+    def _soap_set_test_steps(
         self,
         test_case_id: str,
         test_steps: List[Dict[str, str]],
         project_id: str
     ) -> Dict[str, Any]:
-        """Add test steps to a test case"""
+        """Set test steps using SOAP API (requires username/password)"""
+
+        if not self.username or not self.password:
+            return {
+                "status": "failed",
+                "error": "SOAP API requires username and password. Set POLARION_USERNAME and POLARION_PASSWORD environment variables."
+            }
+
+        # Build SOAP request
+        work_item_uri = f"subterra:data-service:objects:/default/{project_id}${{WorkItem}}{test_case_id}"
+
+        steps_xml = ""
+        for idx, step in enumerate(test_steps):
+            steps_xml += f"""
+            <steps>
+                <index>{idx}</index>
+                <values>
+                    <Text>
+                        <type>text/html</type>
+                        <content>{step.get('step', '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')}</content>
+                        <contentLossy>false</contentLossy>
+                    </Text>
+                    <Text>
+                        <type>text/html</type>
+                        <content>{step.get('expectedResult', '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')}</content>
+                        <contentLossy>false</contentLossy>
+                    </Text>
+                </values>
+            </steps>"""
+
+        soap_request = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:tes="http://ws.polarion.com/TestManagementWebService">
+   <soapenv:Header/>
+   <soapenv:Body>
+      <tes:setTestSteps>
+         <tes:workItemURI>{work_item_uri}</tes:workItemURI>
+         <tes:testSteps>
+            <tes:keys>step</tes:keys>
+            <tes:keys>expectedResult</tes:keys>
+            {steps_xml}
+         </tes:testSteps>
+      </tes:setTestSteps>
+   </soapenv:Body>
+</soapenv:Envelope>"""
+
+        # Make SOAP request with Basic Auth
+        auth = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
+        headers = {
+            "Content-Type": "text/xml; charset=utf-8",
+            "SOAPAction": "",
+            "Authorization": f"Basic {auth}"
+        }
 
         try:
-            # Delete existing test steps first
+            response = requests.post(
+                self.soap_url,
+                data=soap_request,
+                headers=headers,
+                verify=self.verify_ssl,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"Added {len(test_steps)} test steps to {test_case_id} via SOAP API",
+                    "test_case_id": test_case_id,
+                    "steps_added": len(test_steps),
+                    "method": "SOAP",
+                    "url": f"{self.url}/polarion/#/project/{project_id}/workitem?id={test_case_id}"
+                }
+            else:
+                return {
+                    "status": "failed",
+                    "error": f"SOAP request failed: {response.status_code} - {response.text}"
+                }
+
+        except Exception as e:
+            return {
+                "status": "failed",
+                "error": f"SOAP API error: {str(e)}"
+            }
+
+    def add_test_steps(
+        self,
+        test_case_id: str,
+        test_steps: List[Dict[str, str]],
+        project_id: str,
+        force_soap: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Add test steps to a test case
+
+        Strategies:
+        1. REST API (default): POST to /teststeps if work item has no steps
+        2. SOAP API (fallback): Use when REST fails or force_soap=True
+
+        Args:
+            test_case_id: Work item ID (e.g., 'OCP-88278')
+            test_steps: List of dicts with 'step' and 'expectedResult' keys
+            project_id: Polarion project ID (e.g., 'OSE')
+            force_soap: Force use of SOAP API instead of REST
+        """
+
+        # Force SOAP if requested
+        if force_soap:
+            return self._soap_set_test_steps(test_case_id, test_steps, project_id)
+
+        try:
+            # Check if test steps already exist
             check_url = f"projects/{project_id}/workitems/{test_case_id}/relationships/testSteps"
             existing = self._make_request("GET", check_url)
 
-            if "error" not in existing:
-                existing_steps = existing.get("data", [])
-                for step in existing_steps:
-                    step_id = step.get("id", "").split("/")[-1]
-                    self._make_request(
-                        "DELETE",
-                        f"projects/{project_id}/workitems/{test_case_id}/teststeps/{step_id}"
-                    )
+            has_existing_steps = (
+                "error" not in existing and
+                len(existing.get("data", [])) > 0
+            )
 
-            # Build test steps payload
+            # If steps exist, try SOAP API
+            if has_existing_steps:
+                soap_result = self._soap_set_test_steps(test_case_id, test_steps, project_id)
+                if soap_result["status"] == "success":
+                    return soap_result
+                else:
+                    return {
+                        "status": "failed",
+                        "error": "Test steps already exist and SOAP API unavailable. Use force_soap=True with credentials.",
+                        "soap_error": soap_result.get("error")
+                    }
+
+            # Build test steps payload for REST API
             steps_data = []
             for step in test_steps:
                 step_obj = {
@@ -185,7 +328,7 @@ class PolarionClient:
                 }
                 steps_data.append(step_obj)
 
-            # POST test steps
+            # POST test steps via REST API
             result = self._make_request(
                 "POST",
                 f"projects/{project_id}/workitems/{test_case_id}/teststeps",
@@ -193,10 +336,17 @@ class PolarionClient:
             )
 
             if "error" in result:
-                return {
-                    "status": "failed",
-                    "error": result["error"]
-                }
+                # REST failed, try SOAP fallback
+                soap_result = self._soap_set_test_steps(test_case_id, test_steps, project_id)
+                if soap_result["status"] == "success":
+                    return soap_result
+                else:
+                    return {
+                        "status": "failed",
+                        "error": f"REST API failed: {result['error']}. SOAP API also unavailable.",
+                        "rest_error": result["error"],
+                        "soap_error": soap_result.get("error")
+                    }
 
             created_steps = result.get("data", [])
 
@@ -205,6 +355,7 @@ class PolarionClient:
                 "message": f"Added {len(created_steps)} test steps to {test_case_id}",
                 "test_case_id": test_case_id,
                 "steps_added": len(created_steps),
+                "method": "REST",
                 "url": f"{self.url}/polarion/#/project/{project_id}/workitem?id={test_case_id}"
             }
 
