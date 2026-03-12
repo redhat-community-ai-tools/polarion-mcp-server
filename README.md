@@ -69,7 +69,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
     "polarion": {
       "command": "python3",
       "args": [
-        "/Users/rrasouli/Documents/GitHub/polarion-mcp-server/server.py"
+        "/path/to/polarion-mcp-server/server.py"
       ],
       "env": {
         "POLARION_TOKEN": "${POLARION_TOKEN}",
@@ -163,7 +163,7 @@ import_junit_results(
 
 ```python
 export_test_cases_to_spreadsheet(
-    query="type:testcase AND author:rrasouli",
+    query="type:testcase AND author:username",
     output_file="/tmp/my-tests.xlsx",
     include_test_steps=True
 )
