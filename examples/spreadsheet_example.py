@@ -23,7 +23,7 @@ spreadsheet = SpreadsheetIntegration(client)
 # EXPORT EXAMPLE
 print("Exporting test cases...")
 export_result = spreadsheet.export_test_cases(
-    query="title:Windows AND author:rrasouli",
+    query="title:Windows AND status:approved",
     output_file="/tmp/windows-test-cases.xlsx",
     project_id=os.getenv("POLARION_PROJECT", "OSE"),
     include_test_steps=True,

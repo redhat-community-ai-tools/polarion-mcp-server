@@ -22,9 +22,9 @@ junit_importer = JUnitImporter(client)
 
 # Map JUnit test names to Polarion test case IDs
 test_id_mapping = {
-    "com.example.winc.CertificateTest.testKubeletCA": "OCP-88278",
-    "com.example.winc.CertificateTest.testCloudProviderCA": "OCP-88279",
-    "com.example.winc.CertificateTest.testUserCABundle": "OCP-88280"
+    "com.example.winc.CertificateTest.testKubeletCA": "PROJECT-123",
+    "com.example.winc.CertificateTest.testCloudProviderCA": "PROJECT-456",
+    "com.example.winc.CertificateTest.testUserCABundle": "PROJECT-789"
 }
 
 # Import results
