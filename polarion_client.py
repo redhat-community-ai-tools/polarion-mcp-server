@@ -292,28 +292,8 @@ class PolarionClient:
             return self._soap_set_test_steps(test_case_id, test_steps, project_id)
 
         try:
-            # Check if test steps already exist
-            check_url = f"projects/{project_id}/workitems/{test_case_id}/relationships/testSteps"
-            existing = self._make_request("GET", check_url)
-
-            has_existing_steps = (
-                "error" not in existing and
-                len(existing.get("data", [])) > 0
-            )
-
-            # If steps exist, try SOAP API
-            if has_existing_steps:
-                soap_result = self._soap_set_test_steps(test_case_id, test_steps, project_id)
-                if soap_result["status"] == "success":
-                    return soap_result
-                else:
-                    return {
-                        "status": "failed",
-                        "error": "Test steps already exist and SOAP API unavailable. Use force_soap=True with credentials.",
-                        "soap_error": soap_result.get("error")
-                    }
-
             # Build test steps payload for REST API
+            # POST to /teststeps works for both adding and updating test steps
             steps_data = []
             for step in test_steps:
                 step_obj = {
@@ -336,17 +316,13 @@ class PolarionClient:
             )
 
             if "error" in result:
-                # REST failed, try SOAP fallback
-                soap_result = self._soap_set_test_steps(test_case_id, test_steps, project_id)
-                if soap_result["status"] == "success":
-                    return soap_result
-                else:
-                    return {
-                        "status": "failed",
-                        "error": f"REST API failed: {result['error']}. SOAP API also unavailable.",
-                        "rest_error": result["error"],
-                        "soap_error": soap_result.get("error")
-                    }
+                # REST failed - return error without SOAP fallback
+                # (User should delete existing steps first - polarion-cli does this automatically)
+                return {
+                    "status": "failed",
+                    "error": f"REST API failed: {result['error']}",
+                    "hint": "Test steps already exist. Delete them first or use polarion-cli which auto-deletes."
+                }
 
             created_steps = result.get("data", [])
 
