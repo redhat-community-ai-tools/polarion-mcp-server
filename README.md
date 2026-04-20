@@ -52,7 +52,6 @@ pip install -r requirements.txt
 export POLARION_TOKEN="your-personal-access-token"
 export POLARION_URL="https://polarion.engineering.redhat.com"
 export POLARION_PROJECT="OSE"
-export POLARION_VERIFY_SSL="false"  # For internal Red Hat servers
 
 # Optional: For SOAP API support (updating existing test steps)
 export POLARION_USERNAME="your-username"
@@ -74,8 +73,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "env": {
         "POLARION_TOKEN": "${POLARION_TOKEN}",
         "POLARION_URL": "https://polarion.engineering.redhat.com",
-        "POLARION_PROJECT": "OSE",
-        "POLARION_VERIFY_SSL": "false"
+        "POLARION_PROJECT": "OSE"
       }
     }
   }
@@ -466,22 +464,26 @@ The server uses **Personal Access Tokens (PAT)** for authentication. Get your to
 
 - Never commit `POLARION_TOKEN` to version control
 - Use environment variables or secure vaults
-- Set `POLARION_VERIFY_SSL=true` for production
+- SSL verification is enabled by default for secure connections
 - Limit token permissions to minimum required
 
 ## Troubleshooting
 
 ### SSL Certificate Errors
 
-For Red Hat internal Polarion:
+SSL verification is enabled by default for security. If you encounter certificate errors with self-signed certificates or internal servers:
+
+**Option 1: Install the CA certificate (recommended)**
+```bash
+export POLARION_CA_CERT="/path/to/ca-cert.pem"
+```
+
+**Option 2: Disable SSL verification (development only)**
 ```bash
 export POLARION_VERIFY_SSL="false"
 ```
 
-For production systems, download the CA certificate and use:
-```bash
-export POLARION_CA_CERT="/path/to/ca-cert.pem"
-```
+Note: Disabling SSL verification should only be used in trusted development environments, never in production.
 
 ### Authentication Failures
 

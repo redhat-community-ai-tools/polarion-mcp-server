@@ -27,7 +27,7 @@ mcp = FastMCP("Polarion ALM Integration")
 POLARION_URL = os.getenv("POLARION_URL", "https://polarion.engineering.redhat.com")
 POLARION_TOKEN = os.getenv("POLARION_TOKEN")
 DEFAULT_PROJECT = os.getenv("POLARION_PROJECT", "OSE")
-VERIFY_SSL = os.getenv("POLARION_VERIFY_SSL", "false").lower() == "true"
+VERIFY_SSL = os.getenv("POLARION_VERIFY_SSL", "true").lower() == "true"
 
 if not POLARION_TOKEN:
     print("WARNING: POLARION_TOKEN environment variable not set")
