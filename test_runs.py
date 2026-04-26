@@ -111,7 +111,7 @@ class TestRunManager:
 
         if verdict:
             attributes["verdict"] = {
-                "type": "text/html",
+                "type": "text/plain",
                 "value": verdict
             }
 
@@ -231,7 +231,7 @@ class TestRunManager:
                 "id": f"{project_id}/{test_run_id}",
                 "attributes": {
                     "description": {
-                        "type": "text/html",
+                        "type": "text/plain",
                         "value": description
                     }
                 }
