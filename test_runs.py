@@ -251,6 +251,47 @@ class TestRunManager:
             "test_run_id": test_run_id
         }
 
+    def update_test_run_status(
+        self,
+        test_run_id: str,
+        status: str,
+        project_id: str
+    ) -> Dict[str, Any]:
+        """Update test run status (notrun, inprogress, finished)"""
+
+        # Strip project prefix from test_run_id if present (e.g., "OSE/20260423-0808" -> "20260423-0808")
+        if "/" in test_run_id:
+            test_run_id = test_run_id.split("/", 1)[1]
+
+        # Build the update payload
+        update_data = {
+            "data": {
+                "type": "testruns",
+                "id": f"{project_id}/{test_run_id}",
+                "attributes": {
+                    "status": status
+                }
+            }
+        }
+
+        result = self.client._make_request(
+            "PATCH",
+            f"projects/{project_id}/testruns/{test_run_id}",
+            data=update_data
+        )
+
+        if "error" in result:
+            return {
+                "status": "failed",
+                "error": result["error"]
+            }
+
+        return {
+            "status": "success",
+            "message": f"Updated status for test run {test_run_id} to {status}",
+            "test_run_id": test_run_id
+        }
+
     def add_test_cases_to_run(
         self,
         test_run_id: str,
