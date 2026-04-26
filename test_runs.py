@@ -83,7 +83,8 @@ class TestRunManager:
         project_id: str,
         comment: Optional[str] = None,
         executed_by: Optional[str] = None,
-        duration: Optional[int] = None
+        duration: Optional[int] = None,
+        verdict: Optional[str] = None
     ) -> Dict[str, Any]:
         """Update test result within a test run"""
 
@@ -107,6 +108,12 @@ class TestRunManager:
 
         if duration:
             attributes["duration"] = duration
+
+        if verdict:
+            attributes["verdict"] = {
+                "type": "text/html",
+                "value": verdict
+            }
 
         # Test record ID format includes project, test case, and iteration
         test_record_id = f"{project_id}/{test_run_id}/{project_id}/{test_case_id}/0"
@@ -203,6 +210,50 @@ class TestRunManager:
             "run_status": test_run.get("status"),
             "statistics": stats,
             "url": f"{self.client.url}/polarion/redirect/project/{project_id}/testrun?id={test_run_id}"
+        }
+
+    def update_test_run_description(
+        self,
+        test_run_id: str,
+        description: str,
+        project_id: str
+    ) -> Dict[str, Any]:
+        """Update test run description"""
+
+        # Strip project prefix from test_run_id if present (e.g., "OSE/20260423-0808" -> "20260423-0808")
+        if "/" in test_run_id:
+            test_run_id = test_run_id.split("/", 1)[1]
+
+        # Build the update payload
+        update_data = {
+            "data": {
+                "type": "testruns",
+                "id": f"{project_id}/{test_run_id}",
+                "attributes": {
+                    "description": {
+                        "type": "text/html",
+                        "value": description
+                    }
+                }
+            }
+        }
+
+        result = self.client._make_request(
+            "PATCH",
+            f"projects/{project_id}/testruns/{test_run_id}",
+            data=update_data
+        )
+
+        if "error" in result:
+            return {
+                "status": "failed",
+                "error": result["error"]
+            }
+
+        return {
+            "status": "success",
+            "message": f"Updated description for test run {test_run_id}",
+            "test_run_id": test_run_id
         }
 
     def add_test_cases_to_run(
