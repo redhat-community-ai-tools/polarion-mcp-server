@@ -83,8 +83,7 @@ class TestRunManager:
         project_id: str,
         comment: Optional[str] = None,
         executed_by: Optional[str] = None,
-        duration: Optional[int] = None,
-        verdict: Optional[str] = None
+        duration: Optional[int] = None
     ) -> Dict[str, Any]:
         """Update test result within a test run"""
 
@@ -108,12 +107,6 @@ class TestRunManager:
 
         if duration:
             attributes["duration"] = duration
-
-        if verdict:
-            attributes["verdict"] = {
-                "type": "text/plain",
-                "value": verdict
-            }
 
         # Test record ID format includes project, test case, and iteration
         test_record_id = f"{project_id}/{test_run_id}/{project_id}/{test_case_id}/0"
