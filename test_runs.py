@@ -86,6 +86,7 @@ class TestRunManager:
         duration: Optional[int] = None
     ) -> Dict[str, Any]:
         """Update test result within a test run"""
+        from datetime import datetime
 
         # Strip project prefix from test_run_id if present (e.g., "OSE/20260423-0808" -> "20260423-0808")
         if "/" in test_run_id:
@@ -93,7 +94,8 @@ class TestRunManager:
 
         # Build the test record update
         attributes = {
-            "result": result
+            "result": result,
+            "executed": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         }
 
         if comment:
@@ -203,6 +205,91 @@ class TestRunManager:
             "run_status": test_run.get("status"),
             "statistics": stats,
             "url": f"{self.client.url}/polarion/redirect/project/{project_id}/testrun?id={test_run_id}"
+        }
+
+    def update_test_run_description(
+        self,
+        test_run_id: str,
+        description: str,
+        project_id: str
+    ) -> Dict[str, Any]:
+        """Update test run description"""
+
+        # Strip project prefix from test_run_id if present (e.g., "OSE/20260423-0808" -> "20260423-0808")
+        if "/" in test_run_id:
+            test_run_id = test_run_id.split("/", 1)[1]
+
+        # Build the update payload
+        update_data = {
+            "data": {
+                "type": "testruns",
+                "id": f"{project_id}/{test_run_id}",
+                "attributes": {
+                    "description": {
+                        "type": "text/plain",
+                        "value": description
+                    }
+                }
+            }
+        }
+
+        result = self.client._make_request(
+            "PATCH",
+            f"projects/{project_id}/testruns/{test_run_id}",
+            data=update_data
+        )
+
+        if "error" in result:
+            return {
+                "status": "failed",
+                "error": result["error"]
+            }
+
+        return {
+            "status": "success",
+            "message": f"Updated description for test run {test_run_id}",
+            "test_run_id": test_run_id
+        }
+
+    def update_test_run_status(
+        self,
+        test_run_id: str,
+        status: str,
+        project_id: str
+    ) -> Dict[str, Any]:
+        """Update test run status (notrun, inprogress, finished)"""
+
+        # Strip project prefix from test_run_id if present (e.g., "OSE/20260423-0808" -> "20260423-0808")
+        if "/" in test_run_id:
+            test_run_id = test_run_id.split("/", 1)[1]
+
+        # Build the update payload
+        update_data = {
+            "data": {
+                "type": "testruns",
+                "id": f"{project_id}/{test_run_id}",
+                "attributes": {
+                    "status": status
+                }
+            }
+        }
+
+        result = self.client._make_request(
+            "PATCH",
+            f"projects/{project_id}/testruns/{test_run_id}",
+            data=update_data
+        )
+
+        if "error" in result:
+            return {
+                "status": "failed",
+                "error": result["error"]
+            }
+
+        return {
+            "status": "success",
+            "message": f"Updated status for test run {test_run_id} to {status}",
+            "test_run_id": test_run_id
         }
 
     def add_test_cases_to_run(
