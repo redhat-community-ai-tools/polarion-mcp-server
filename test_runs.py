@@ -86,6 +86,7 @@ class TestRunManager:
         duration: Optional[int] = None
     ) -> Dict[str, Any]:
         """Update test result within a test run"""
+        from datetime import datetime
 
         # Strip project prefix from test_run_id if present (e.g., "OSE/20260423-0808" -> "20260423-0808")
         if "/" in test_run_id:
@@ -93,7 +94,8 @@ class TestRunManager:
 
         # Build the test record update
         attributes = {
-            "result": result
+            "result": result,
+            "executed": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         }
 
         if comment:
