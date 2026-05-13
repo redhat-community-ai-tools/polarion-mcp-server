@@ -96,7 +96,6 @@ create_polarion_test_case(
     title="Verify certificate validation",
     description="Test that certificates are read from controllerConfig",
     test_steps="1. Check config\n2. Verify certs\n3. Validate",
-    expected_results="All certificates valid",
     severity="should_have",
     status="draft"
 )
@@ -176,107 +175,39 @@ import_test_cases_from_spreadsheet(
 )
 ```
 
-## Test Steps Management Strategies
+## Test Steps Management
 
-The server supports two strategies for managing test steps, working around a known Polarion REST API limitation.
-
-### Limitation: Test Steps Relationship is READ-ONLY
-
-The Polarion REST API v1 has a limitation where the `testSteps` relationship cannot be modified after initial creation:
-
-- **POST /teststeps**: Only works if NO test steps exist (blank slate)
-- **DELETE /teststeps/{index}**: Removes step content but doesn't clear metadata flag
-- **PATCH /workitems** with testSteps: Not supported (malformed JSON error)
-- **PATCH /relationships/testSteps**: Fails with "Cannot modify read-only field(s)"
-
-### Strategy 1: Blank Slate (Default - REST API)
-
-Create test steps IMMEDIATELY when creating the test case, before any manual edits:
+The server uses a **delete-then-create** strategy via the REST API to add or replace test steps on any test case, whether new or existing.
 
 ```python
-# Create test case WITH test steps in one operation
-create_polarion_test_case(
-    title="Certificate validation test",
-    description="Verify certificates from controllerConfig",
-    test_steps=[
-        {"step": "Check node status", "expectedResult": "All nodes Ready"},
-        {"step": "Verify certificate", "expectedResult": "Certificate valid"}
-    ],
-    blank_slate_strategy=True  # Default - adds steps immediately
-)
-```
-
-**Advantages:**
-- Uses REST API only (Bearer token authentication)
-- Atomic operation
-- No credentials needed beyond access token
-- Works for new test cases
-
-**Limitation:**
-- Only works for NEW test cases (before any manual edits)
-
-### Strategy 2: SOAP API Fallback (For Existing Test Cases)
-
-Use SOAP API to UPDATE existing test steps (requires username/password):
-
-```python
-# For test cases that already have steps
+# Works for both new and existing test cases
 add_test_steps_to_testcase(
     test_case_id="PROJECT-123",
     test_steps=[
-        {"step": "Updated step 1", "expectedResult": "Updated result 1"},
-        {"step": "Updated step 2", "expectedResult": "Updated result 2"}
-    ],
-    force_soap=True  # Use SOAP API instead of REST
+        {"step": "Run command: oc get nodes", "expectedResult": "All nodes Ready"},
+        {"step": "Verify certificate", "expectedResult": "Certificate valid"}
+    ]
 )
 ```
 
-**Configuration Required:**
+When a test case already has steps, the server automatically deletes the existing steps and creates the new ones. No manual cleanup or SOAP credentials are needed.
+
+### SOAP API Fallback
+
+For environments where the REST delete endpoint is unavailable, the SOAP API can be used as a fallback with `force_soap=True`. This requires username/password credentials:
+
 ```bash
 export POLARION_USERNAME="your-username"
 export POLARION_PASSWORD="your-password"
 ```
 
-**Advantages:**
-- Can UPDATE existing test steps
-- Replaces all steps at once
-- Works for test cases with manual edits
-
-**Requirements:**
-- Polarion username/password (not just Bearer token)
-- Basic Authentication support
-
-### Automatic Fallback
-
-The server automatically tries SOAP API if REST fails:
-
 ```python
-# Automatically detects existing steps and uses SOAP if available
-result = add_test_steps_to_testcase(
+add_test_steps_to_testcase(
     test_case_id="PROJECT-123",
-    test_steps=[...]
+    test_steps=[...],
+    force_soap=True
 )
-
-# Result includes method used
-print(result["method"])  # "REST" or "SOAP"
 ```
-
-### Recommended Workflow
-
-**For New Test Cases:**
-1. Use `create_polarion_test_case()` with `test_steps` parameter
-2. Let `blank_slate_strategy=True` add steps immediately
-3. No manual intervention needed
-
-**For Existing Test Cases:**
-1. Set `POLARION_USERNAME` and `POLARION_PASSWORD` environment variables
-2. Use `add_test_steps_to_testcase()` with `force_soap=True`
-3. SOAP API will replace all existing steps
-
-**For Automation:**
-- Always create test cases programmatically with steps
-- Avoid manual edits before automation completes
-- Use SOAP API only when absolutely necessary
 
 ## API Documentation
 
@@ -290,7 +221,6 @@ Create a new test case in Polarion.
 - `description` (str): Detailed description
 - `project_id` (str): Project ID (default: from env)
 - `test_steps` (str, optional): Test steps (newline-separated)
-- `expected_results` (str, optional): Expected outcomes
 - `severity` (str): must_have, should_have, nice_to_have, will_not_have
 - `status` (str): draft, approved, etc.
 
@@ -445,6 +375,7 @@ This server uses several Polarion REST API endpoints, including some undocumente
 | `/projects/{id}/workitems` | POST | Create workitem | Yes |
 | `/projects/{id}/workitems/{id}` | PATCH | Update workitem | Yes |
 | `/projects/{id}/workitems/{id}/teststeps` | POST | **Add test steps** | **No - Discovered!** |
+| `/projects/{id}/workitems/{id}/teststeps` | DELETE | **Bulk delete test steps** | **No - Discovered!** |
 | `/projects/{id}/workitems/{id}/teststeps/{index}` | GET | Get test step | **No - Discovered!** |
 | `/projects/{id}/workitems/{id}/teststeps/{index}` | DELETE | Delete test step | **No - Discovered!** |
 | `/projects/{id}/testruns` | POST | Create test run | Yes |
