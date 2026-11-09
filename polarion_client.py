@@ -434,6 +434,7 @@ class PolarionClient:
         result = self._make_request(
             "GET",
             f"projects/{project_id}/workitems/{test_case_id}",
+            params={"fields[workitems]": "title,type,status,severity,description"},
         )
 
         if "error" in result:
@@ -446,6 +447,7 @@ class PolarionClient:
 
         response = {
             "status": "success",
+            "id": test_case_id,
             "test_case_id": test_case_id,
             "title": test_case.get("title"),
             "type": test_case.get("type"),
