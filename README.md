@@ -5,13 +5,14 @@ A comprehensive Model Context Protocol (MCP) server for Siemens Polarion ALM int
 ## Features
 
 ### Test Case Management
-- Create test cases with full details
+- Create test cases with full details (all Polarion fields supported)
 - Update test case attributes
 - Search and query test cases
 - **Add/update test steps** (REST API + SOAP API fallback)
 - **Blank Slate Strategy** - Add test steps immediately upon creation
 - **SOAP API Integration** - Override existing test steps with username/password auth
-- Link test cases to requirements
+- **Link test cases** to bugs or requirements (e.g. `verifies` relationship)
+- **Full field support** - automation status, setup, teardown, test type, importance, level, version, and more
 
 ### Test Run Management
 - Create test runs
@@ -88,10 +89,9 @@ python3 server.py
 
 ## Usage Examples
 
-### 1. Create a Test Case
+### 1. Create a Test Case (basic)
 
 ```python
-# Using the MCP tool
 create_polarion_test_case(
     title="Verify certificate validation",
     description="Test that certificates are read from controllerConfig",
@@ -101,7 +101,38 @@ create_polarion_test_case(
 )
 ```
 
-### 2. Add Test Steps
+### 2. Create a Test Case (all fields)
+
+```python
+create_polarion_test_case(
+    title="Duplicate BIOS UUID: verify correct VM disks after migration",
+    description="Bug verification for MTV-5091/MTV-5326.",
+    severity="should_have",
+    status="draft",
+    caseautomation="manualonly",
+    automation_script="Manual only - behavioral E2E test has ~33% false negative rate",
+    setup="Source Provider: vmware-8 (vSphere 8).\nTarget Provider: host (OpenShift).",
+    teardown="Delete migration plan and migrated VM from OpenShift.",
+    testtype="functional",
+    caseposneg="positive",
+    caseimportance="high",
+    caselevel="system",
+    version=["2.12."],
+    customerscenario=False
+)
+```
+
+### 3. Link Test Case to Bug or Requirement
+
+```python
+link_polarion_work_item(
+    test_case_id="MTV-694",
+    target_id="MTV-5091",
+    role="verifies"
+)
+```
+
+### 4. Add Test Steps
 
 ```python
 add_test_steps_to_testcase(
@@ -119,7 +150,7 @@ add_test_steps_to_testcase(
 )
 ```
 
-### 3. Create Test Run
+### 5. Create Test Run
 
 ```python
 create_test_run(
@@ -130,7 +161,7 @@ create_test_run(
 )
 ```
 
-### 4. Update Test Run Results
+### 6. Update Test Run Results
 
 ```python
 update_test_run_result(
@@ -143,7 +174,7 @@ update_test_run_result(
 )
 ```
 
-### 5. Import JUnit Results
+### 7. Import JUnit Results
 
 ```python
 import_junit_results(
@@ -156,7 +187,7 @@ import_junit_results(
 )
 ```
 
-### 6. Export to Spreadsheet
+### 8. Export to Spreadsheet
 
 ```python
 export_test_cases_to_spreadsheet(
@@ -166,7 +197,7 @@ export_test_cases_to_spreadsheet(
 )
 ```
 
-### 7. Import from Spreadsheet
+### 9. Import from Spreadsheet
 
 ```python
 import_test_cases_from_spreadsheet(
@@ -223,8 +254,30 @@ Create a new test case in Polarion.
 - `test_steps` (str, optional): Test steps (newline-separated)
 - `severity` (str): must_have, should_have, nice_to_have, will_not_have
 - `status` (str): draft, approved, etc.
+- `caseautomation` (str, optional): `notautomated`, `automated`, or `manualonly`
+- `automation_script` (str, optional): Script path or explanation why manual only
+- `setup` (str, optional): Preconditions / environment setup
+- `teardown` (str, optional): Cleanup instructions
+- `testtype` (str, optional): `functional`, `nonfunctional`, `structural`
+- `caseposneg` (str, optional): `positive` or `negative`
+- `caseimportance` (str, optional): `critical`, `high`, `medium`, `low`
+- `caselevel` (str, optional): `component`, `integration`, `system`, `acceptance`
+- `version` (list, optional): Version strings, e.g. `["2.12."]`
+- `customerscenario` (bool, optional): Whether this is a customer scenario
 
 **Returns:** JSON with test case ID and URL
+
+#### `link_polarion_work_item`
+Link a test case to a bug or requirement.
+
+**Parameters:**
+- `test_case_id` (str): Source test case ID (e.g., "MTV-694")
+- `target_id` (str): Target work item ID (e.g., "MTV-5091")
+- `role` (str): Link role — `verifies`, `parent`, `relates_to`, `duplicates`
+- `project_id` (str): Project ID of the source
+- `target_project_id` (str, optional): Project ID of the target (defaults to same)
+
+**Returns:** JSON with link status
 
 #### `add_test_steps_to_testcase`
 Add or replace test steps for a test case.
@@ -441,7 +494,7 @@ Contributions welcome! Areas for improvement:
 - Advanced query builders
 - Test run templates
 - Attachment management
-- Custom field support
+- ~~Custom field support~~ (done - see v1.1.0)
 
 ## License
 
@@ -460,6 +513,11 @@ Discovered and documented undocumented Polarion REST API test steps endpoints.
 - Polarion Docs: https://developer.siemens.com/polarion/
 
 ## Changelog
+
+### v1.1.0 (2026-06-16)
+- Full test case field support: automation status, setup, teardown, test type, importance, level, version, customer scenario, automation script
+- Work item linking (e.g. test case `verifies` a bug)
+- Rich text fields (setup, teardown, automation_script) use proper Polarion HTML format
 
 ### v1.0.0 (2026-03-12)
 - Initial release

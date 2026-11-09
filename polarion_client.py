@@ -113,7 +113,17 @@ class PolarionClient:
         test_steps: Optional[List[Dict[str, str]]] = None,
         severity: str = "should_have",
         status: str = "draft",
-        blank_slate_strategy: bool = True
+        blank_slate_strategy: bool = True,
+        caseautomation: Optional[str] = None,
+        automation_script: Optional[str] = None,
+        setup: Optional[str] = None,
+        teardown: Optional[str] = None,
+        testtype: Optional[str] = None,
+        caseposneg: Optional[str] = None,
+        caseimportance: Optional[str] = None,
+        caselevel: Optional[str] = None,
+        version: Optional[List[str]] = None,
+        customerscenario: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
         Create a new test case with optional immediate test steps
@@ -127,21 +137,63 @@ class PolarionClient:
             status: Test case status
             blank_slate_strategy: If True and test_steps provided, add steps immediately
                                   before any manual edits (prevents REST API limitation)
+            caseautomation: Automation status (notautomated, automated, manualonly)
+            automation_script: Automation script content or explanation (HTML)
+            setup: Setup/precondition text (HTML)
+            teardown: Teardown/cleanup text (HTML)
+            testtype: Test type (functional, nonfunctional, structural)
+            caseposneg: Positive or negative test (positive, negative)
+            caseimportance: Importance level (critical, high, medium, low)
+            caselevel: Test level (component, integration, system, acceptance)
+            version: List of version strings (e.g. ["2.12."])
+            customerscenario: Whether this is a customer scenario (True/False)
         """
+
+        attributes = {
+            "type": "testcase",
+            "title": title,
+            "description": {
+                "type": "text/html",
+                "value": description.replace("\n", "<br/>")
+            },
+            "status": status,
+            "severity": severity
+        }
+
+        if caseautomation:
+            attributes["caseautomation"] = caseautomation
+        if automation_script:
+            attributes["automation_script"] = {
+                "type": "text/html",
+                "value": automation_script.replace("\n", "<br/>")
+            }
+        if setup:
+            attributes["setup"] = {
+                "type": "text/html",
+                "value": setup.replace("\n", "<br/>")
+            }
+        if teardown:
+            attributes["teardown"] = {
+                "type": "text/html",
+                "value": teardown.replace("\n", "<br/>")
+            }
+        if testtype:
+            attributes["testtype"] = testtype
+        if caseposneg:
+            attributes["caseposneg"] = caseposneg
+        if caseimportance:
+            attributes["caseimportance"] = caseimportance
+        if caselevel:
+            attributes["caselevel"] = caselevel
+        if version:
+            attributes["version"] = version
+        if customerscenario is not None:
+            attributes["customerscenario"] = customerscenario
 
         workitem_data = {
             "data": [{
                 "type": "workitems",
-                "attributes": {
-                    "type": "testcase",
-                    "title": title,
-                    "description": {
-                        "type": "text/html",
-                        "value": description.replace("\n", "<br/>")
-                    },
-                    "status": status,
-                    "severity": severity
-                }
+                "attributes": attributes
             }]
         }
 
@@ -496,6 +548,35 @@ class PolarionClient:
             attributes["status"] = kwargs["status"]
         if kwargs.get("severity"):
             attributes["severity"] = kwargs["severity"]
+        if kwargs.get("caseautomation"):
+            attributes["caseautomation"] = kwargs["caseautomation"]
+        if kwargs.get("automation_script"):
+            attributes["automation_script"] = {
+                "type": "text/html",
+                "value": kwargs["automation_script"].replace("\n", "<br/>")
+            }
+        if kwargs.get("setup"):
+            attributes["setup"] = {
+                "type": "text/html",
+                "value": kwargs["setup"].replace("\n", "<br/>")
+            }
+        if kwargs.get("teardown"):
+            attributes["teardown"] = {
+                "type": "text/html",
+                "value": kwargs["teardown"].replace("\n", "<br/>")
+            }
+        if kwargs.get("testtype"):
+            attributes["testtype"] = kwargs["testtype"]
+        if kwargs.get("caseposneg"):
+            attributes["caseposneg"] = kwargs["caseposneg"]
+        if kwargs.get("caseimportance"):
+            attributes["caseimportance"] = kwargs["caseimportance"]
+        if kwargs.get("caselevel"):
+            attributes["caselevel"] = kwargs["caselevel"]
+        if kwargs.get("version"):
+            attributes["version"] = kwargs["version"]
+        if "customerscenario" in kwargs and kwargs["customerscenario"] is not None:
+            attributes["customerscenario"] = kwargs["customerscenario"]
 
         if not attributes:
             return {
@@ -527,6 +608,53 @@ class PolarionClient:
             "status": "success",
             "message": f"Test case {test_case_id} updated successfully",
             "updated_fields": list(attributes.keys())
+        }
+
+    def link_work_item(
+        self,
+        test_case_id: str,
+        target_id: str,
+        role: str,
+        project_id: str,
+        target_project_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Link a work item to another with a role (e.g. verifies)"""
+
+        target_proj = target_project_id or project_id
+        payload = {
+            "data": [{
+                "type": "linkedworkitems",
+                "attributes": {
+                    "role": role,
+                    "suspect": False
+                },
+                "relationships": {
+                    "workItem": {
+                        "data": {
+                            "type": "workitems",
+                            "id": f"{target_proj}/{target_id}"
+                        }
+                    }
+                }
+            }]
+        }
+
+        result = self._make_request(
+            "POST",
+            f"projects/{project_id}/workitems/{test_case_id}/linkedworkitems",
+            data=payload
+        )
+
+        if "error" in result:
+            return {
+                "status": "failed",
+                "error": result["error"]
+            }
+
+        return {
+            "status": "success",
+            "message": f"Linked {test_case_id} --{role}--> {target_id}",
+            "link_id": f"{project_id}/{test_case_id}/{role}/{target_proj}/{target_id}"
         }
 
     def search_test_cases(

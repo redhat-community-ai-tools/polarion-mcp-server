@@ -66,7 +66,17 @@ def create_polarion_test_case(
     project_id: str = DEFAULT_PROJECT,
     test_steps: Optional[str] = None,
     severity: str = "should_have",
-    status: str = "draft"
+    status: str = "draft",
+    caseautomation: Optional[str] = None,
+    automation_script: Optional[str] = None,
+    setup: Optional[str] = None,
+    teardown: Optional[str] = None,
+    testtype: Optional[str] = None,
+    caseposneg: Optional[str] = None,
+    caseimportance: Optional[str] = None,
+    caselevel: Optional[str] = None,
+    version: Optional[List[str]] = None,
+    customerscenario: Optional[bool] = None,
 ) -> str:
     """
     Create a new test case in Polarion.
@@ -78,6 +88,16 @@ def create_polarion_test_case(
         test_steps: Step-by-step test instructions (newline-separated)
         severity: Importance level (must_have, should_have, nice_to_have, will_not_have)
         status: Initial status (draft, approved, etc.)
+        caseautomation: Automation status (notautomated, automated, manualonly)
+        automation_script: Automation script path or explanation why manual only
+        setup: Setup/precondition text for the test case
+        teardown: Teardown/cleanup text for the test case
+        testtype: Test type (functional, nonfunctional, structural)
+        caseposneg: Positive or negative test (positive, negative)
+        caseimportance: Importance level (critical, high, medium, low)
+        caselevel: Test level (component, integration, system, acceptance)
+        version: List of version strings (e.g. ["2.12."])
+        customerscenario: Whether this is a customer scenario (True/False)
 
     Returns:
         JSON string with created test case ID and details
@@ -89,7 +109,17 @@ def create_polarion_test_case(
             project_id=project_id,
             test_steps=test_steps,
             severity=severity,
-            status=status
+            status=status,
+            caseautomation=caseautomation,
+            automation_script=automation_script,
+            setup=setup,
+            teardown=teardown,
+            testtype=testtype,
+            caseposneg=caseposneg,
+            caseimportance=caseimportance,
+            caselevel=caselevel,
+            version=version,
+            customerscenario=customerscenario,
         )
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -172,7 +202,17 @@ def update_polarion_test_case(
     title: Optional[str] = None,
     description: Optional[str] = None,
     status: Optional[str] = None,
-    severity: Optional[str] = None
+    severity: Optional[str] = None,
+    caseautomation: Optional[str] = None,
+    automation_script: Optional[str] = None,
+    setup: Optional[str] = None,
+    teardown: Optional[str] = None,
+    testtype: Optional[str] = None,
+    caseposneg: Optional[str] = None,
+    caseimportance: Optional[str] = None,
+    caselevel: Optional[str] = None,
+    version: Optional[List[str]] = None,
+    customerscenario: Optional[bool] = None,
 ) -> str:
     """
     Update an existing test case in Polarion.
@@ -184,6 +224,16 @@ def update_polarion_test_case(
         description: New description (optional)
         status: New status (optional)
         severity: New severity (optional)
+        caseautomation: Automation status (notautomated, automated, manualonly)
+        automation_script: Automation script path or explanation why manual only
+        setup: Setup/precondition text for the test case
+        teardown: Teardown/cleanup text for the test case
+        testtype: Test type (functional, nonfunctional, structural)
+        caseposneg: Positive or negative test (positive, negative)
+        caseimportance: Importance level (critical, high, medium, low)
+        caselevel: Test level (component, integration, system, acceptance)
+        version: List of version strings (e.g. ["2.12."])
+        customerscenario: Whether this is a customer scenario (True/False)
 
     Returns:
         JSON string with update status
@@ -195,7 +245,17 @@ def update_polarion_test_case(
             title=title,
             description=description,
             status=status,
-            severity=severity
+            severity=severity,
+            caseautomation=caseautomation,
+            automation_script=automation_script,
+            setup=setup,
+            teardown=teardown,
+            testtype=testtype,
+            caseposneg=caseposneg,
+            caseimportance=caseimportance,
+            caselevel=caselevel,
+            version=version,
+            customerscenario=customerscenario,
         )
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -227,6 +287,43 @@ def search_polarion_test_cases(
             query=query,
             project_id=project_id,
             limit=limit
+        )
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "status": "failed",
+            "error": str(e)
+        }, indent=2)
+
+
+@mcp.tool()
+def link_polarion_work_item(
+    test_case_id: str,
+    target_id: str,
+    role: str = "verifies",
+    project_id: str = DEFAULT_PROJECT,
+    target_project_id: Optional[str] = None,
+) -> str:
+    """
+    Link a test case to another work item (e.g. verifies a requirement).
+
+    Args:
+        test_case_id: Source test case ID (e.g., "MTV-690")
+        target_id: Target work item ID to link to (e.g., "MTV-436")
+        role: Link role (verifies, parent, relates_to, duplicates, etc.)
+        project_id: Project ID of the source test case
+        target_project_id: Project ID of the target (defaults to same as source)
+
+    Returns:
+        JSON string with link status
+    """
+    try:
+        result = polarion_client.link_work_item(
+            test_case_id=test_case_id,
+            target_id=target_id,
+            role=role,
+            project_id=project_id,
+            target_project_id=target_project_id,
         )
         return json.dumps(result, indent=2)
     except Exception as e:
